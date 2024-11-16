@@ -1,0 +1,54 @@
+# Node modules directory
+node_modules/
+
+# json file for users.json 
+
+/users.json
+
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Directory for transpiled code
+dist/
+build/
+
+# Environment variables
+.env
+
+# Cache and temp files
+.nyc_output
+coverage/
+.cache/
+.tmp/
+
+# IDE-specific files
+.idea/
+.vscode/
+*.sublime-workspace
+
+# System files
+.DS_Store
+Thumbs.db
+
+# npm-specific files
+package-lock.json*
+yarn.lock
+pnpm-lock.yaml
+
+# Miscellaneous
+*.swp
+*.bak
+*.tmp
+*.backup

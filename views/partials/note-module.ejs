@@ -1,0 +1,41 @@
+<% posts.reverse().forEach(post => { %>
+    <% if (post.creator === user) { %>
+        <!-- if the post creator is the current user it will show his notes in this formal-->
+        <div class="input-group" data-post-id="<%= post._id %>">
+            <input type="text" class="form-control" placeholder="<%= post.text %>" disabled aria-label="Close">
+            <span class="input-group-text"><%= post.upvotes.length - post.downvotes.length %></span>
+        </div>
+    <% } else { %>
+        <!-- else if its not that users notes then it will be the other notes created by other users-->
+        <div class="input-group" data-post-id="<%= post._id %>">
+            <input type="text" class="form-control" placeholder="<%= post.text %>" disabled aria-label="Close">
+
+            <!-- Upvote Button -->
+            <form action="/upvote" method="post">
+                <input type="hidden" name="user_email" value="<%= user %>">
+                <input type="hidden" name="post_id" value="<%= post._id %>">
+                <button type="submit" class="btn <%= post.upvotes.includes(user) ? 'btn-success' : 'btn-outline-success' %> upvote">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-up" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M8 15a.5.5 0 0 0 .5-.5V2.707l3.146 3.147a.5.5 0 0 0 .708-.708l-4-4a.5.5 0 0 0-.708 0l-4 4a.5.5 0 1 0 .708.708L7.5 2.707V14.5a.5.5 0 0 0 .5.5"/>
+                    </svg>
+                </button>
+            </form>
+
+            <!-- Downvote Button -->
+            <form action="/downvote" method="post">
+                <input type="hidden" name="user_email" value="<%= user %>">
+                <input type="hidden" name="post_id" value="<%= post._id %>">
+                <button type="submit" class="btn <%= post.downvotes.includes(user) ? 'btn-danger' : 'btn-outline-danger' %> downvote">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-down" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M8 1a.5.5 0 0 1 .5.5v11.793l3.146-3.147a.5.5 0 0 1 .708.708l-4 4a.5.5 0 0 1-.708 0l-4-4a.5.5 0 0 1 .708-.708L7.5 13.293V1.5A.5.5 0 0 1 8 1"/>
+                    </svg>
+                </button>
+            </form>
+
+            <!-- Rating Display -->
+            <% if (post.upvotes.includes(user) || post.downvotes.includes(user)) { %>
+                <span class="input-group-text"><%= post.upvotes.length - post.downvotes.length %></span>
+            <% } %>
+        </div>
+    <% } %>
+<% }); %>
