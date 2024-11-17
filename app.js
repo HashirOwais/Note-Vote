@@ -1,4 +1,10 @@
 const express = require("express");
+
+
+
+const session = require("express-session")
+const passport = require("passport")
+const passportLocalMongoose = require("passport-local-mongoose")
 require("dotenv").config();
 
 
@@ -10,9 +16,12 @@ mongoose.connect( "mongodb://localhost:27017/note-vote");
 
 // create a mongoose schema for a User
 const userSchema = new mongoose.Schema ({
-    email:   String,
+    username:   String,
     password: String
 });
+
+userSchema.plugin(passportLocalMongoose);
+
 
 const User = mongoose.model ( "User", userSchema );
 
@@ -31,10 +40,26 @@ const postSchema = new mongoose.Schema ({
 const Post = mongoose.model ( "post", postSchema );
 
 
+//Add our strategy for using Passport, using the local user from MongoDB
+passport.use(User.createStrategy());
+
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
+////////////////////////////////////////////////////////////////////
+
 
 
 // Create the Express app
 const app = express();
+
+app.use(session({
+    secret: process.env.SECRET,
+    resave: false,
+    saveUninitialized: false
+}));
+
+app.use (passport.initialize());
+app.use (passport.session());
 
 // Set EJS as the templating engine
 app.set("view engine", "ejs");
@@ -53,83 +78,64 @@ app.listen(port, () => console.log(`Server is running on http://localhost:${port
 app.get("/", (req, res) => res.sendFile(__dirname + "/index.html"));
 
 // POST this route is for to handle login and load posts
-app.post("/note-vote", async(req, res) => {
-    try {
-        const findUser = await User.find({
-            email: {$eq: req.body["email"]},
-            password: {$eq: req.body["password"]}
-        });
-
-        console.log(findUser);
-
-        if(findUser.length > 0)
-            {
+app.post("/note-vote", (req, res) => {
+    console.log( "User " + req.body.username + " is attempting to log in" );
+    const user = new User ({
+        username: req.body.username,
+        password: req.body.password
+    });
+    req.login ( user, ( err ) => {
+        if ( err ) {
+            console.log( err );
+            res.redirect( "/" );
+        } else {
+            passport.authenticate( "local" )( req, res, async() => {
                 try {
                     const posts = await Post.find()
-                    return res.render("note-vote", { user: { email: req.body["email"] }, posts: posts });
+                    return res.render("note-vote", { user: { username: req.body.username }, posts: posts });
 
                     
                 } catch (error) {
-                    return
+                    console.log(error)
                     
                 }
-
-            }
-            else
-            {
-                return res.send("user doesnt exist or password is inncorrect")
-            }
-         
-    } catch (error) {
-        return res.send("error")
-        
-    }
+            });
+        }
+    });
+   
    
 });
 
 // POST /register this route is to Handle user registration
-app.post("/register", async (req, res) => {
-    if (req.body["invite-code"] === "Note Vote 2024") {
-        try {
-            // Check if a user with the given email already exists
-            const existingUser = await User.find({ email: { $eq: req.body["email"] } });
+app.post("/register",  (req, res) => {
 
-            console.log(existingUser);
+    if (req.body["invite-code"] === process.env.INVITE_CODE) {
+        User.register({ username : req.body.username }, 
+            req.body.password, 
+            ( err, user ) => {
+if ( err ) {
+console.log( err );
+    res.redirect( "/" );
+} else {
+    passport.authenticate( "local" )( req, res,async () => {
+         // Get all 
+         try {
+            const posts = await Post.find();
 
-            if (existingUser.length === 0) {
-                console.log("WE ARE HERE!");
-                // If the user does not exist, create a new user
-                const newUser = new User({
-                    email: req.body["email"],
-                    password: req.body["password"]
-                });
-
-                // Save the new user to the database
-                await newUser.save();
-
-                // Get all posts
-                try {
-                    const posts = await Post.find();
-
-                    console.log(posts);
-                    console.log("User made");
-                    // Render the note-vote page with user and posts data
-                    return res.render("note-vote", { user: { email: req.body["email"] }, posts: posts });
-
-                } catch (error) {
-                    console.log("Error fetching posts:", error);
-                    return;
-                }
-
-            } else {
-                // If the user already exists, throw an error to be caught in the outer catch block
-                throw new Error("User already exists");
-            }
+            console.log(posts);
+            console.log("User made");
+            // Render the note-vote page with user and posts data
+            return res.render("note-vote", { user: { username: req.user.username}, posts: posts });
 
         } catch (error) {
-            console.log("Error occurred during registration:", error.message);
-            return res.send("Error occurred during registration");
+            console.log("Error fetching posts:", error);
+            return;
         }
+        
+    });
+}
+});
+       
     } else {
         // Invalid invite code
         return res.send("Invalid invite code");
@@ -146,7 +152,7 @@ app.post("/addpost", async(req, res) => {
         {
             _id: length,
             text: req.body["note"],
-            creator: req.body["user_email"],
+            creator: req.user.username,
             upvotes: [],
             downvotes: []
 
@@ -156,7 +162,7 @@ app.post("/addpost", async(req, res) => {
 
         try {
             const posts = await Post.find();
-            return res.render("note-vote", { user: { email: req.body["user_email"] }, posts: posts });
+            return res.render("note-vote", { user: { username: req.body["user_username"] }, posts: posts });
 
             
         } catch (error) {
@@ -184,74 +190,90 @@ app.get("/logout", (req, res) => {
 
 
 // POST /upvote - Handle upvoting a post and render updated note-vote page
-app.post("/upvote", async(req, res) => {
+app.post("/upvote", async (req, res) => {
     try {
-        let post = await Post.find({_id : parseInt(req.body["post_id"])})
-        console.log(post);
-        
-    } catch (error) {
-        return;
-        
-    }
+        const currentUser = req.user.username;
+        const postId = parseInt(req.body["post_id"]);
 
-    let postId = parseInt(req.body["post_id"]);
-    let userEmail = req.body["user_email"];
-
-    fs.readFile(__dirname + "/posts.json", "utf8", (err, jsonString) => {
-        if (err) return res.status(500).send("Server error");
-
-        try {
-            let posts = JSON.parse(jsonString);
-
-            posts.forEach(post => {
-                if (post._id === postId) {
-                    if (!post.upvotes.includes(userEmail)) {
-                        post.upvotes.push(userEmail);
-                        post.downvotes = post.downvotes.filter(user => user !== userEmail);
-                    } else {
-                        post.upvotes = post.upvotes.filter(user => user !== userEmail);
-                    }
-                }
-            });
-
-            fs.writeFile(__dirname + "/posts.json", JSON.stringify(posts, null, 2), "utf8", err => {
-                if (err) return res.status(500).send("Server error");
-                res.render("note-vote", { user: { email: userEmail }, posts: posts });
-            });
-        } catch (err) {
-            res.status(500).send("Error parsing posts JSON");
+        // Find the post to be upvoted
+        const post = await Post.findOne({ _id: postId });
+        if (!post) {
+            return res.status(404).send("Post not found");
         }
-    });
+
+        // Initialize upvotes and downvotes
+        let upvotes = post.upvotes;
+        let downvotes = post.downvotes;
+
+        // Update upvotes and downvotes
+        if (!upvotes.includes(currentUser)) {
+            upvotes.push(currentUser);
+            downvotes = downvotes.filter(user => user !== currentUser);
+        } else {
+            upvotes = upvotes.filter(user => user !== currentUser);
+        }
+
+        // Save the updated post
+        await Post.updateOne(
+            { _id: postId },
+            { $set: { upvotes: upvotes, downvotes: downvotes } }
+        );
+
+        // Fetch all posts for rendering or further use
+        const posts = await Post.find();
+
+        // Optionally render the view or send a response
+        res.render("note-vote", { user: { username: currentUser }, posts: posts });
+    } catch (error) {
+        console.error("Error in upvoting:", error);
+        res.status(500).send("Error in upvoting");
+    }
 });
+
 
 // POST /downvote - Handle downvoting a post and render updated note-vote page
-app.post("/downvote", (req, res) => {
-    let postId = parseInt(req.body["post_id"]);
-    let userEmail = req.body["user_email"];
+app.post("/downvote", async (req, res) => {
+    try {
+        const currentUser = req.user.username; // Correctly retrieve the logged-in user
+        const postId = parseInt(req.body["post_id"]); // Get the post ID from the request body
 
-    fs.readFile(__dirname + "/posts.json", "utf8", (err, jsonString) => {
-        if (err) return res.status(500).send("Server error");
-
-        try {
-            let posts = JSON.parse(jsonString);
-
-            posts.forEach(post => {
-                if (post._id === postId) {
-                    if (!post.downvotes.includes(userEmail)) {
-                        post.downvotes.push(userEmail);
-                        post.upvotes = post.upvotes.filter(user => user !== userEmail);
-                    } else {
-                        post.downvotes = post.downvotes.filter(user => user !== userEmail);
-                    }
-                }
-            });
-
-            fs.writeFile(__dirname + "/posts.json", JSON.stringify(posts, null, 2), "utf8", err => {
-                if (err) return res.status(500).send("Server error");
-                res.render("note-vote", { user: { email: userEmail }, posts: posts });
-            });
-        } catch (err) {
-            res.status(500).send("Error parsing posts JSON");
+        // Find the post to be downvoted
+        const post = await Post.findOne({ _id: postId });
+        if (!post) {
+            return res.status(404).send("Post not found");
         }
-    });
+
+        // Initialize upvotes and downvotes
+        let upvotes = post.upvotes;
+        let downvotes = post.downvotes;
+
+        // Update downvotes and upvotes
+        if (!downvotes.includes(currentUser)) {
+            downvotes.push(currentUser); // Add the user to downvotes
+            upvotes = upvotes.filter(user => user !== currentUser); // Remove the user from upvotes
+        } else {
+            downvotes = downvotes.filter(user => user !== currentUser); // Toggle downvote off
+        }
+
+        // Save the updated post
+        await Post.updateOne(
+            { _id: postId },
+            { $set: { upvotes: upvotes, downvotes: downvotes } }
+        );
+
+        // Fetch all posts for rendering
+        const posts = await Post.find();
+
+        // Render the updated view
+        res.render("note-vote", { user: { username: currentUser }, posts: posts });
+    } catch (error) {
+        console.error("Error in downvoting:", error);
+        res.status(500).send("Error in downvoting");
+    }
 });
+
+
+            
+   
+   
+
