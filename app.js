@@ -78,7 +78,7 @@ app.listen(port, () => console.log(`Server is running on http://localhost:${port
 app.get("/", (req, res) => res.sendFile(__dirname + "/index.html"));
 
 // POST this route is for to handle login and load posts
-app.post("/note-vote", (req, res) => {
+app.post("/login", (req, res) => {
     console.log( "User " + req.body.username + " is attempting to log in" );
     const user = new User ({
         username: req.body.username,
@@ -89,21 +89,34 @@ app.post("/note-vote", (req, res) => {
             console.log( err );
             res.redirect( "/" );
         } else {
-            passport.authenticate( "local" )( req, res, async() => {
-                try {
-                    const posts = await Post.find()
-                    return res.render("note-vote", { user: { username: req.body.username }, posts: posts });
-
-                    
-                } catch (error) {
-                    console.log(error)
-                    
-                }
+            passport.authenticate( "local" )( req, res, () => {
+                res.redirect("note-vote");
+                
             });
         }
     });
    
    
+});
+
+app.get("/note-vote", async(req, res) =>{
+    //checking if user is autheticaated to enter the /note-vote route
+    console.log("A user is accessing the reviews route using get, and...");
+    if ( req.isAuthenticated() ){
+        try {
+            const posts = await Post.find()
+            return res.render("note-vote", { user: { username: req.user.username }, posts: posts });
+
+            
+        } catch (error) {
+            console.log(error)
+            
+        }
+    } else {
+        console.log( "was not authorized." );
+        res.redirect( "/" );
+    }
+    
 });
 
 // POST /register this route is to Handle user registration
@@ -183,10 +196,14 @@ app.post("/addpost", async(req, res) => {
 });
 
 // GET /logout - this route is to Handle user logout
-app.get("/logout", (req, res) => {
-    res.redirect("/");
-});
-
+app.get('/logout', function(req, res, next) {
+    req.logout(function(err) {
+      if (err) { 
+          return next(err); 
+      }
+      res.redirect('/');
+    });
+  });
 
 
 // POST /upvote - Handle upvoting a post and render updated note-vote page
