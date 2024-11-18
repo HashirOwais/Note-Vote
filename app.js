@@ -1,13 +1,8 @@
 const express = require("express");
 const mongoose = require( "mongoose" );
 
-
 // connect to mongoose on port 27017
 mongoose.connect( "mongodb://localhost:27017/note-vote");
-
-// importing the user and the post models
-const User = require("./model/UserModel");
-const Post = require("./model/postModel");
 
 // importing the authcontroller and postcontroller
 
@@ -20,13 +15,14 @@ const passport = require("passport")
 require("dotenv").config();
 
 
+// importing the user 
+const User = require("./model/UserModel");
 
-//Add our strategy for using Passport, using the local user from MongoDB
-passport.use(User.createStrategy());
+passport.use(User.createStrategy()); //This tells Passport to use the local authentication strategy provided by passport-local-mongoose.
 
-passport.serializeUser(User.serializeUser());
-passport.deserializeUser(User.deserializeUser());
-////////////////////////////////////////////////////////////////////
+passport.serializeUser(User.serializeUser()); //This defines how Passport will store user information in the session.
+
+passport.deserializeUser(User.deserializeUser()); //This defines how Passport will retrieve the full user information from the unique identifier stored in the session.
 
 
 
