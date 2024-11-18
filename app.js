@@ -55,7 +55,7 @@ app.use(express.urlencoded({ extended: true }));
 app.listen(process.env.PORT, () => console.log(`Server is running on http://localhost:${process.env.PORT}`));
 
 // Home route (Login page)
-app.get("/", (req, res) => res.sendFile(__dirname + "/index.html"));
+app.get("/", (req, res) => res.render("index"));
 
 // POST this route is for to handle login and load posts
 app.post("/login", authcontroller.auth_login);
