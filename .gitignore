@@ -5,7 +5,7 @@ node_modules/
 
 /users.json
 
-package.json
+/package.json
 
 # Logs
 logs/
